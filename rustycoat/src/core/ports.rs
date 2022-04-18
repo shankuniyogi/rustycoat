@@ -1,15 +1,14 @@
 use std::sync::mpsc::{self, Receiver, Sender};
 
-pub enum Port<T>
+pub struct OutputPort<T>
 where
     T: Send + Default + Copy,
 {
-    Output { value: T, s: Sender<T> },
-    Input { value: T, r: Receiver<T> },
-    None(T),
+    value: T,
+    sender: Option<Sender<T>>,
 }
 
-impl<T> Default for Port<T>
+impl<T> Default for OutputPort<T>
 where
     T: Send + Default + Copy,
 {
@@ -18,61 +17,90 @@ where
     }
 }
 
-impl<T> Port<T>
+impl<T> OutputPort<T>
 where
     T: Send + Default + Copy,
 {
     pub fn new() -> Self {
-        Self::None(T::default())
+        Self::with_initial_value(T::default())
     }
 
     pub fn with_initial_value(initial_value: T) -> Self {
-        Self::None(initial_value)
+        Self { value: initial_value, sender: None }
     }
 
-    pub fn connect_to(&mut self, target: &mut Self) {
+    pub fn connect_to(&mut self, target: &mut InputPort<T>) {
         let (s, r): (Sender<T>, Receiver<T>) = mpsc::channel();
-        let value = if let Self::None(initial_value) = self {
-            *initial_value
-        } else {
-            panic!("Pin already connected");
-        };
-        *self = Self::Output { value, s };
-        *target = Self::Input { value, r };
+        if self.sender.is_some() {
+            panic!("Output port already connected");
+        }
+        self.sender = Some(s);
+        target.receiver = Some(r);
     }
 
     pub fn update(&mut self, new_value: T) {
-        match self {
-            Self::Output { value, s } => {
-                *value = new_value;
-                s.send(new_value).unwrap();
-            },
-            Self::Input { .. } => panic!("Attempt to send to an input port"),
-            _ => (),
-        }
-    }
-
-    pub fn wait(&mut self) -> T {
-        match self {
-            Self::Input { r, value } => {
-                if let Ok(new_value) = r.recv() {
-                    *value = new_value;
-                }
-                *value
-            },
-            _ => panic!("Attempt to receive from a non-input port"),
+        if let Some(s) = self.sender.as_mut() {
+            self.value = new_value;
+            s.send(new_value).unwrap();
+        } else {
+            panic!("Output port not connected");
         }
     }
 
     pub fn value(&self) -> T {
-        match self {
-            Self::Output { value, .. } => *value,
-            Self::Input { value, .. } => *value,
-            Self::None(value) => *value,
-        }
+        self.value
     }
 }
 
-pub type Pin = Port<bool>;
-pub type Port8 = Port<u8>;
-pub type Port16 = Port<u16>;
+pub type OutputPin = OutputPort<bool>;
+pub type OutputPort8 = OutputPort<u8>;
+pub type OutputPort16 = OutputPort<u16>;
+
+pub struct InputPort<T>
+where
+    T: Send + Default + Copy,
+{
+    value: T,
+    receiver: Option<Receiver<T>>,
+}
+
+impl<T> Default for InputPort<T>
+where
+    T: Send + Default + Copy,
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<T> InputPort<T>
+where
+    T: Send + Default + Copy,
+{
+    pub fn new() -> Self {
+        Self::with_initial_value(T::default())
+    }
+
+    pub fn with_initial_value(initial_value: T) -> Self {
+        Self { value: initial_value, receiver: None }
+    }
+
+    pub fn wait(&mut self) -> T {
+        if let Some(r) = self.receiver.as_mut() {
+            if let Ok(new_value) = r.recv() {
+                self.value = new_value;
+            }
+            self.value
+        } else {
+            panic!("Input port not connected");
+        }
+    }
+
+    pub fn value(&self) -> T {
+        self.value
+    }
+}
+
+pub type InputPin = InputPort<bool>;
+pub type InputPort8 = InputPort<u8>;
+pub type InputPort16 = InputPort<u16>;

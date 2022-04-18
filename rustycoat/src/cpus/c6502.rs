@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 use crate::core::memory::*;
-use crate::core::ports::Pin;
+use crate::core::ports::InputPin;
 use crate::core::*;
 
 pub struct C6502 {
@@ -21,7 +21,7 @@ pub struct C6502 {
     extra_addr: u16,
     memory: Arc<Mutex<Memory>>,
     state: CpuState,
-    clock_in: Pin,
+    clock_in: InputPin,
 }
 
 impl fmt::Debug for C6502 {
@@ -64,7 +64,7 @@ impl C6502 {
             extra_addr: 0x0000,
             state: CpuState::Off,
             memory: memory.clone(),
-            clock_in: Pin::new(),
+            clock_in: InputPin::new(),
         }
     }
 
@@ -72,7 +72,7 @@ impl C6502 {
         self.state
     }
 
-    pub fn clock_in(&mut self) -> &mut Pin {
+    pub fn clock_in(&mut self) -> &mut InputPin {
         &mut self.clock_in
     }
 
