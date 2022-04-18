@@ -28,3 +28,5 @@ x http://6502.org/tutorials/compare_instructions.html
 https://www.esocop.org/docs/MOS6510UnintendedOpcodes-20152412.pdf
 
 https://www.pagetable.com/c64ref/c64mem/
+
+http://c64os.com/post/howthekeyboardworks

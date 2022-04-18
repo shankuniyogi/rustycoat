@@ -14,17 +14,58 @@ where
     phantom_data: std::marker::PhantomData<T>,
 }
 
+impl<T> BinaryGate<T>
+where
+    T: BinaryOp + Send,
+{
+    pub fn new() -> Self {
+        Self::with_initial_values(false, false)
+    }
+
+    pub fn with_initial_values(input_a: bool, input_b: bool) -> Self {
+        Self {
+            input_a: InputPin::with_initial_value(input_a),
+            input_b: InputPin::with_initial_value(input_b),
+            output: OutputPin::with_initial_value(T::op(input_a, input_b)),
+            phantom_data: std::marker::PhantomData::default(),
+        }
+    }
+
+    pub fn input_a(&mut self) -> &mut InputPin {
+        &mut self.input_a
+    }
+
+    pub fn input_b(&mut self) -> &mut InputPin {
+        &mut self.input_b
+    }
+
+    pub fn output(&mut self) -> &mut OutputPin {
+        &mut self.output
+    }
+}
+
+impl<T> Default for BinaryGate<T>
+where
+    T: BinaryOp + Send,
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<T> Component for BinaryGate<T>
 where
     T: BinaryOp + Send,
 {
     fn run(&mut self, stop: Arc<AtomicBool>) {
         loop {
-            InputPin::wait_any(&[&self.input_a, &self.input_b]);
+            InputPin::wait_any(&mut [&mut self.input_a, &mut self.input_b]);
             if stop.load(Ordering::Relaxed) {
                 break;
             }
-            self.output.update(T::op(self.input_a.value(), self.input_b.value()));
+            let output = T::op(self.input_a.value(), self.input_b.value());
+            println!("{}", output);
+            self.output.update(output);
         }
     }
 }

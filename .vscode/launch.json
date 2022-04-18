@@ -7,15 +7,34 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug executable 'rustycoat'",
+            "name": "Debug unit tests in library 'rustycoat'",
             "cargo": {
                 "args": [
-                    "build",
-                    "--bin=rustycoat",
+                    "test",
+                    "--no-run",
+                    "--lib",
                     "--package=rustycoat"
                 ],
                 "filter": {
                     "name": "rustycoat",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'rtest'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=rtest",
+                    "--package=rtest"
+                ],
+                "filter": {
+                    "name": "rtest",
                     "kind": "bin"
                 }
             },
@@ -25,16 +44,16 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug unit tests in executable 'rustycoat'",
+            "name": "Debug unit tests in executable 'rtest'",
             "cargo": {
                 "args": [
                     "test",
                     "--no-run",
-                    "--bin=rustycoat",
-                    "--package=rustycoat"
+                    "--bin=rtest",
+                    "--package=rtest"
                 ],
                 "filter": {
-                    "name": "rustycoat",
+                    "name": "rtest",
                     "kind": "bin"
                 }
             },

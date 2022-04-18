@@ -64,7 +64,7 @@ impl Computer {
         }
         for component in self.components.iter_mut() {
             if let ComponentState::Running { handle, .. } = mem::replace(component, ComponentState::None) {
-                handle.join().unwrap();
+                handle.join().ok();
             }
         }
     }

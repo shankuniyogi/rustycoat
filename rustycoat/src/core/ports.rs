@@ -39,11 +39,9 @@ where
     }
 
     pub fn update(&mut self, new_value: T) {
+        self.value = new_value;
         if let Some(s) = self.sender.as_mut() {
-            self.value = new_value;
-            s.send(new_value).unwrap();
-        } else {
-            panic!("Output port not connected");
+            s.send(new_value).ok();
         }
     }
 
@@ -100,16 +98,31 @@ where
         self.value
     }
 
-    pub fn wait_any(ports: &[&Self]) -> Option<usize> {
+    pub fn wait_any(ports: &mut [&mut Self]) -> Option<usize> {
         let mut select = Select::new();
-        for port in ports {
+        for port in ports.iter() {
             if let Some(r) = &port.receiver {
                 select.recv(r);
-            } else {
-                panic!("Input port not connected");
             }
         }
-        Some(select.select().index())
+        let s = select.select();
+        let mut idx = s.index();
+        for (i, _) in ports.iter().enumerate() {
+            if let Some(r) = &ports[i].receiver {
+                if idx == 0 {
+                    if let Ok(val) = s.recv(r) {
+                        ports[i].value = val;
+                        return Some(i);
+                    } else {
+                        break;
+                    }
+                } else {
+                    idx -= 1;
+                }
+            }
+        }
+
+        None
     }
 }
 
