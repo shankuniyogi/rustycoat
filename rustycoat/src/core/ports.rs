@@ -1,4 +1,4 @@
-use std::sync::mpsc::{self, Receiver, Sender};
+use crossbeam_channel::{unbounded, Receiver, Select, Sender};
 
 pub struct OutputPort<T>
 where
@@ -30,7 +30,7 @@ where
     }
 
     pub fn connect_to(&mut self, target: &mut InputPort<T>) {
-        let (s, r): (Sender<T>, Receiver<T>) = mpsc::channel();
+        let (s, r): (Sender<T>, Receiver<T>) = unbounded();
         if self.sender.is_some() {
             panic!("Output port already connected");
         }
@@ -98,6 +98,18 @@ where
 
     pub fn value(&self) -> T {
         self.value
+    }
+
+    pub fn wait_any(ports: &[&Self]) -> Option<usize> {
+        let mut select = Select::new();
+        for port in ports {
+            if let Some(r) = &port.receiver {
+                select.recv(r);
+            } else {
+                panic!("Input port not connected");
+            }
+        }
+        Some(select.select().index())
     }
 }
 
