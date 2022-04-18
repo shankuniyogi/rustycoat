@@ -1,24 +1,28 @@
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
-use super::*;
+pub trait MemoryBank {
+    fn size(&self) -> usize;
+    fn is_writeable(&self, addr: u16) -> bool;
+    fn read_byte(&self, addr: u16, offset: u16, ram: &[u8]) -> u8;
+    fn write_byte(&mut self, addr: u16, offset: u16, val: u8, ram: &mut [u8]);
+}
 
 pub struct Memory {
     ram: Vec<u8>,
-    banks: Vec<Box<dyn MemoryBank>>,
+    banks: Vec<Box<dyn MemoryBank + Send>>,
     map: [(usize, u16); 256],
 }
 
 impl Memory {
-    pub fn new_shared() -> Rc<RefCell<Self>> {
-        Rc::new(RefCell::new(Self {
+    pub fn new_shared() -> Arc<Mutex<Self>> {
+        Arc::new(Mutex::new(Self {
             ram: vec![0; 65536],
             banks: Vec::new(),
             map: [(0, 0); 256],
         }))
     }
 
-    pub fn configure_banks(&mut self, banks: Vec<Box<dyn MemoryBank>>, configs: &[(u16, u16, usize, u16)]) {
+    pub fn configure_banks(&mut self, banks: Vec<Box<dyn MemoryBank + Send>>, configs: &[(u16, u16, usize, u16)]) {
         self.banks = banks;
         self.map.fill((0, 0));
         for e in configs {
@@ -140,7 +144,7 @@ mod tests {
     #[test]
     fn ram() {
         let memory = Memory::new_shared();
-        let mut mem = memory.borrow_mut();
+        let mut mem = memory.lock().unwrap();
         mem.write_byte(0xBADA, 0xFC);
         assert_eq!(mem.read_byte(0xBADA), 0xFC);
     }
@@ -148,7 +152,7 @@ mod tests {
     #[test]
     fn banked_ram() {
         let memory = Memory::new_shared();
-        let mut mem = memory.borrow_mut();
+        let mut mem = memory.lock().unwrap();
         mem.configure_banks(
             vec![TestBank::new_boxed(2048, true)],
             &[(0x3000, 1024, 1, 0x0000), (0x8000, 1024, 1, 0x0400)],
@@ -170,7 +174,7 @@ mod tests {
     #[test]
     fn banked_rom() {
         let memory = Memory::new_shared();
-        let mut mem = memory.borrow_mut();
+        let mut mem = memory.lock().unwrap();
         mem.configure_banks(
             vec![RomBank::with_bytes(&[0xDE, 0xAD, 0xBE, 0xEF])],
             &[(0x3000, 1024, 1, 0x0000)],

@@ -6,3 +6,5 @@ authors = ["Shanku Niyogi <shanku@freerange.dev>"]
 homepage = "https://github.com/freerange-dev/rustycoat"
 license = "MIT"
 edition = "2021"
+
+[dependencies]

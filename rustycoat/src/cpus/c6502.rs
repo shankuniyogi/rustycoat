@@ -1,8 +1,10 @@
-use std::cell::RefCell;
 use std::fmt;
-use std::rc::Rc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
+use std::time::Instant;
 
 use crate::core::memory::*;
+use crate::core::*;
 
 pub struct C6502 {
     pc: u16,
@@ -16,8 +18,9 @@ pub struct C6502 {
     value: u8,
     addr: u16,
     extra_addr: u16,
-    memory: Rc<RefCell<Memory>>,
+    memory: Arc<Mutex<Memory>>,
     state: CpuState,
+    clock_in: Pin,
 }
 
 impl fmt::Debug for C6502 {
@@ -45,8 +48,8 @@ impl C6502 {
     pub const RESET_VECTOR: u16 = 0xFFFC;
     pub const IRQ_VECTOR: u16 = 0xFFFE;
 
-    pub fn new_shared(memory: &Rc<RefCell<Memory>>) -> Rc<RefCell<Self>> {
-        Rc::new(RefCell::new(Self {
+    pub fn new(memory: &Arc<Mutex<Memory>>) -> Self {
+        Self {
             pc: 0x00FF,
             ac: 0xAA,
             x: 0x00,
@@ -59,12 +62,17 @@ impl C6502 {
             addr: 0x0000,
             extra_addr: 0x0000,
             state: CpuState::Off,
-            memory: Rc::clone(memory),
-        }))
+            memory: memory.clone(),
+            clock_in: Pin::new(0),
+        }
     }
 
     pub fn state(&self) -> CpuState {
         self.state
+    }
+
+    pub fn clock_in(&mut self) -> &mut Pin {
+        &mut self.clock_in
     }
 
     pub fn reset(&mut self) {
@@ -312,7 +320,7 @@ impl C6502 {
     }
 
     fn read_byte(&self, addr: u16) -> u8 {
-        self.memory.borrow().read_byte(addr)
+        self.memory.lock().unwrap().read_byte(addr)
     }
 
     fn read_pc_byte(&self) -> u8 {
@@ -323,7 +331,7 @@ impl C6502 {
         if self.sp == 0 {
             panic!("Stack overflow");
         }
-        self.memory.borrow_mut().write_byte(Self::STACK_BASE + self.sp as u16, value);
+        self.memory.lock().unwrap().write_byte(Self::STACK_BASE + self.sp as u16, value);
         self.sp -= 1;
     }
 
@@ -335,11 +343,11 @@ impl C6502 {
     }
 
     fn read_stack_byte(&mut self) -> u8 {
-        self.memory.borrow().read_byte(Self::STACK_BASE + self.sp as u16)
+        self.memory.lock().unwrap().read_byte(Self::STACK_BASE + self.sp as u16)
     }
 
     fn write_byte(&mut self, addr: u16, value: u8) {
-        self.memory.borrow_mut().write_byte(addr, value);
+        self.memory.lock().unwrap().write_byte(addr, value);
     }
 
     /// Go through reset cycle.
@@ -1399,6 +1407,37 @@ impl C6502 {
         } else {
             self.p & !Self::SR_OVERFLOW
         };
+    }
+}
+
+impl Component for C6502 {
+    fn run(&mut self, stop: Arc<AtomicBool>) {
+        let mut cycles = 0;
+        let mut start = Instant::now();
+        loop {
+            if cycles == 0 {
+                start = Instant::now();
+            }
+            let signal = self.clock_in.wait();
+            if stop.load(Ordering::Relaxed) {
+                break;
+            }
+            match signal {
+                0xFF => {
+                    self.step();
+                    cycles += 1;
+                },
+                0 => (),
+                _ => panic!("Unexpected clock signal {}", signal),
+            }
+        }
+        let elapsed = start.elapsed();
+        println!(
+            "Executed {} cycles in {} ms, speed {} MHz",
+            cycles,
+            elapsed.as_millis(),
+            cycles as f64 / elapsed.as_millis() as f64 / 1000.0
+        );
     }
 }
 
