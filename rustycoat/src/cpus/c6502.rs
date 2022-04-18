@@ -4,6 +4,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 use crate::core::memory::*;
+use crate::core::ports::Pin;
 use crate::core::*;
 
 pub struct C6502 {
@@ -63,7 +64,7 @@ impl C6502 {
             extra_addr: 0x0000,
             state: CpuState::Off,
             memory: memory.clone(),
-            clock_in: Pin::new(0),
+            clock_in: Pin::new(),
         }
     }
 
@@ -1422,13 +1423,10 @@ impl Component for C6502 {
             if stop.load(Ordering::Relaxed) {
                 break;
             }
-            match signal {
-                0xFF => {
-                    self.step();
-                    cycles += 1;
-                },
-                0 => (),
-                _ => panic!("Unexpected clock signal {}", signal),
+            if signal {
+                self.step();
+                cycles += 1;
+            } else {
             }
         }
         let elapsed = start.elapsed();

@@ -1,11 +1,13 @@
-use super::*;
-use std::sync::atomic::AtomicU8;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::thread;
 use std::time::{Duration, Instant};
+
+use crate::core::ports::Pin;
+use crate::core::Component;
 
 pub struct Clock {
     interval: Duration,
-    state: Arc<AtomicU8>,
     output: Pin,
 }
 
@@ -13,13 +15,12 @@ impl Clock {
     pub fn new(ticks_per_second: u64) -> Self {
         Self {
             interval: Duration::from_nanos(1_000_000_000 / ticks_per_second / 2),
-            state: Arc::new(AtomicU8::new(0)),
-            output: Pin::new(0),
+            output: Pin::new(),
         }
     }
 
     pub fn state(&self) -> bool {
-        self.state.load(Ordering::SeqCst) != 0
+        self.output.value()
     }
 
     pub fn output(&mut self) -> &mut Pin {
@@ -48,8 +49,7 @@ impl Component for Clock {
                 time = start.elapsed();
                 break;
             }
-            let tick = self.state.fetch_xor(0xFF, Ordering::SeqCst) ^ 0xFF;
-            self.output.update(tick);
+            self.output.update(!self.output.value());
         }
         println!(
             "Clock: {} ticks in {} ms, speed {} MHz",
