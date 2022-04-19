@@ -33,8 +33,8 @@ fn main() {
     cpu.reset();
 
     // Create a 1MHz clock and wire it up to the CPU.
-    let mut clock = Clock::new(1_000_000);
-    clock.output().connect_to(cpu.clock_in());
+    let mut clock = Clock::new(2_000_000);
+    clock.output().connect_to(cpu.phi0_in());
 
     // Create a computer, add components, and start it up.
     let mut c = Computer::new();

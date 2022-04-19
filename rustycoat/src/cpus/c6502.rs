@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use crate::core::memory::*;
-use crate::core::ports::InputPin;
+use crate::core::ports::{InputPin, OutputPin};
 use crate::core::*;
 
 pub struct C6502 {
@@ -21,7 +21,10 @@ pub struct C6502 {
     extra_addr: u16,
     memory: Memory,
     state: CpuState,
-    clock_in: InputPin,
+
+    phi0_in: InputPin,
+    phi1_out: OutputPin,
+    phi2_out: OutputPin,
 }
 
 impl fmt::Debug for C6502 {
@@ -64,7 +67,9 @@ impl C6502 {
             extra_addr: 0x0000,
             state: CpuState::Off,
             memory: memory.clone(),
-            clock_in: InputPin::new(),
+            phi0_in: InputPin::new(),
+            phi1_out: OutputPin::new(),
+            phi2_out: OutputPin::new(),
         }
     }
 
@@ -72,8 +77,16 @@ impl C6502 {
         self.state
     }
 
-    pub fn clock_in(&mut self) -> &mut InputPin {
-        &mut self.clock_in
+    pub fn phi0_in(&mut self) -> &mut InputPin {
+        &mut self.phi0_in
+    }
+    
+    pub fn phi1_out(&mut self) -> &mut OutputPin {
+        &mut self.phi1_out
+    }
+
+    pub fn phi2_out(&mut self) -> &mut OutputPin {
+        &mut self.phi2_out
     }
 
     pub fn reset(&mut self) {
@@ -1419,15 +1432,20 @@ impl Component for C6502 {
             if cycles == 0 {
                 start = Instant::now();
             }
-            let signal = self.clock_in.wait();
+            let signal = self.phi0_in.wait();
             if stop.load(Ordering::Relaxed) {
                 break;
             }
+
+            self.phi1_out.update(!signal);
+            self.phi2_out.update(signal);
             if signal {
                 self.step();
                 cycles += 1;
             } else {
             }
+
+            // TODO: Handle interrupts before next clock cycle
         }
         let elapsed = start.elapsed();
         println!(
