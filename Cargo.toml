@@ -1,8 +1,11 @@
-[workspace]
-members = [
-    "rustycoat",
-    "rtest",
-]
+[package]
+name = "rustycoat"
+description = "Rustycoat library"
+version = "0.1.0"
+authors = ["Shanku Niyogi <shanku@freerange.dev>"]
+homepage = "https://github.com/freerange-dev/rustycoat"
+license = "MIT"
+edition = "2021"
 
-exclude = [
-]
+[dependencies]
+crossbeam-channel = "0.5"
