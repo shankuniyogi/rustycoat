@@ -26,16 +26,16 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug executable 'rtest'",
+            "name": "Debug example 'rtest'",
             "cargo": {
                 "args": [
                     "build",
-                    "--bin=rtest",
-                    "--package=rtest"
+                    "--example=rtest",
+                    "--package=rustycoat"
                 ],
                 "filter": {
                     "name": "rtest",
-                    "kind": "bin"
+                    "kind": "example"
                 }
             },
             "args": [],
@@ -44,17 +44,17 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug unit tests in executable 'rtest'",
+            "name": "Debug unit tests in example 'rtest'",
             "cargo": {
                 "args": [
                     "test",
                     "--no-run",
-                    "--bin=rtest",
-                    "--package=rtest"
+                    "--example=rtest",
+                    "--package=rustycoat"
                 ],
                 "filter": {
                     "name": "rtest",
-                    "kind": "bin"
+                    "kind": "example"
                 }
             },
             "args": [],
