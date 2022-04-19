@@ -1,8 +1,7 @@
 use super::*;
-use std::sync::{Arc, Mutex};
 
 struct CpuTest {
-    mem: Arc<Mutex<Memory>>,
+    mem: Memory,
     cpu: C6502,
     ins_location: u16,
     ac: u8,
@@ -16,7 +15,7 @@ struct CpuTest {
 
 impl CpuTest {
     fn new() -> Self {
-        let mem = Memory::new_shared();
+        let mem = Memory::new();
         let cpu = C6502::new(&mem);
         CpuTest {
             mem,
@@ -39,13 +38,13 @@ impl CpuTest {
     }
 
     fn with_instruction(&mut self, ins_bytes: &[u8]) -> &mut Self {
-        self.mem.lock().unwrap().write_block(self.ins_location, ins_bytes);
+        self.mem.write_block(self.ins_location, ins_bytes);
         self.ins_location += ins_bytes.len() as u16;
         self
     }
 
     fn with_data(&mut self, location: u16, data: &[u8]) -> &mut Self {
-        self.mem.lock().unwrap().write_block(location, data);
+        self.mem.write_block(location, data);
         self
     }
 
@@ -56,10 +55,7 @@ impl CpuTest {
 
     fn with_stack(&mut self, stack: &[u8]) -> &mut Self {
         self.sp = 0xFF - stack.len() as u8;
-        self.mem
-            .lock()
-            .unwrap()
-            .write_block(C6502::STACK_BASE + self.sp as u16 + 1, stack);
+        self.mem.write_block(C6502::STACK_BASE + self.sp as u16 + 1, stack);
         self
     }
 
@@ -103,14 +99,11 @@ impl CpuTest {
     }
 
     fn data(&self, location: u16) -> u8 {
-        self.mem.lock().unwrap().read_byte(location)
+        self.mem.read_byte(location)
     }
 
     fn stack(&self, pos: u8) -> u8 {
-        self.mem
-            .lock()
-            .unwrap()
-            .read_byte(C6502::STACK_BASE + self.sp as u16 + 1 + pos as u16)
+        self.mem.read_byte(C6502::STACK_BASE + self.sp as u16 + 1 + pos as u16)
     }
 
     fn values<T>(&self, observe_fn: fn(&Self) -> T) -> T {

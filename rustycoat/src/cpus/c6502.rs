@@ -1,6 +1,6 @@
 use std::fmt;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::Instant;
 
 use crate::core::memory::*;
@@ -19,7 +19,7 @@ pub struct C6502 {
     value: u8,
     addr: u16,
     extra_addr: u16,
-    memory: Arc<Mutex<Memory>>,
+    memory: Memory,
     state: CpuState,
     clock_in: InputPin,
 }
@@ -49,7 +49,7 @@ impl C6502 {
     pub const RESET_VECTOR: u16 = 0xFFFC;
     pub const IRQ_VECTOR: u16 = 0xFFFE;
 
-    pub fn new(memory: &Arc<Mutex<Memory>>) -> Self {
+    pub fn new(memory: &Memory) -> Self {
         Self {
             pc: 0x00FF,
             ac: 0xAA,
@@ -321,7 +321,7 @@ impl C6502 {
     }
 
     fn read_byte(&self, addr: u16) -> u8 {
-        self.memory.lock().unwrap().read_byte(addr)
+        self.memory.read_byte(addr)
     }
 
     fn read_pc_byte(&self) -> u8 {
@@ -332,7 +332,7 @@ impl C6502 {
         if self.sp == 0 {
             panic!("Stack overflow");
         }
-        self.memory.lock().unwrap().write_byte(Self::STACK_BASE + self.sp as u16, value);
+        self.memory.write_byte(Self::STACK_BASE + self.sp as u16, value);
         self.sp -= 1;
     }
 
@@ -344,11 +344,11 @@ impl C6502 {
     }
 
     fn read_stack_byte(&mut self) -> u8 {
-        self.memory.lock().unwrap().read_byte(Self::STACK_BASE + self.sp as u16)
+        self.memory.read_byte(Self::STACK_BASE + self.sp as u16)
     }
 
     fn write_byte(&mut self, addr: u16, value: u8) {
-        self.memory.lock().unwrap().write_byte(addr, value);
+        self.memory.write_byte(addr, value);
     }
 
     /// Go through reset cycle.

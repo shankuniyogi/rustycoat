@@ -1,5 +1,49 @@
 use std::sync::{Arc, Mutex};
 
+#[derive(Clone)]
+pub struct Memory(Arc<Mutex<MemoryImpl>>);
+
+impl Memory {
+    pub fn new() -> Self {
+        Self(Arc::new(Mutex::new(MemoryImpl {
+            ram: vec![0; 65536],
+            banks: Vec::new(),
+            map: [(0, 0); 256],
+        })))
+    }
+
+    pub fn configure_banks(&self, banks: Vec<Box<dyn MemoryBank + Send>>, configs: &[(u16, u16, usize, u16)]) {
+        self.0.lock().unwrap().configure_banks(banks, configs);
+    }
+
+    pub fn read_byte(&self, address: u16) -> u8 {
+        self.0.lock().unwrap().read_byte(address)
+    }
+
+    pub fn write_byte(&self, address: u16, value: u8) {
+        self.0.lock().unwrap().write_byte(address, value)
+    }
+
+    pub fn read_block(&self, start: u16, data: &mut [u8]) {
+        self.0.lock().unwrap().read_block(start, data)
+    }
+
+    pub fn write_block(&self, start: u16, data: &[u8]) {
+        self.0.lock().unwrap().write_block(start, data)
+    }
+
+    #[allow(dead_code)]
+    fn read_bank_byte(&self, bank_id: usize, addr: u16, offset: u16) -> u8 {
+        let mem = self.0.lock().unwrap();
+        mem.banks[bank_id - 1].read_byte(addr, offset, &mem.ram)
+    }
+
+    #[allow(dead_code)]
+    fn ram(&self, addr: u16) -> u8 {
+        self.0.lock().unwrap().ram[addr as usize]
+    }
+}
+
 pub trait MemoryBank {
     fn size(&self) -> usize;
     fn is_writeable(&self, addr: u16) -> bool;
@@ -7,22 +51,14 @@ pub trait MemoryBank {
     fn write_byte(&mut self, addr: u16, offset: u16, val: u8, ram: &mut [u8]);
 }
 
-pub struct Memory {
+struct MemoryImpl {
     ram: Vec<u8>,
     banks: Vec<Box<dyn MemoryBank + Send>>,
     map: [(usize, u16); 256],
 }
 
-impl Memory {
-    pub fn new_shared() -> Arc<Mutex<Self>> {
-        Arc::new(Mutex::new(Self {
-            ram: vec![0; 65536],
-            banks: Vec::new(),
-            map: [(0, 0); 256],
-        }))
-    }
-
-    pub fn configure_banks(&mut self, banks: Vec<Box<dyn MemoryBank + Send>>, configs: &[(u16, u16, usize, u16)]) {
+impl MemoryImpl {
+    fn configure_banks(&mut self, banks: Vec<Box<dyn MemoryBank + Send>>, configs: &[(u16, u16, usize, u16)]) {
         self.banks = banks;
         self.map.fill((0, 0));
         for e in configs {
@@ -39,7 +75,7 @@ impl Memory {
         }
     }
 
-    pub fn read_byte(&self, address: u16) -> u8 {
+    fn read_byte(&self, address: u16) -> u8 {
         let (bank_id, offset) = self.map[(address >> 8) as usize];
         if bank_id > 0 {
             self.banks[bank_id - 1].read_byte(address, offset, &self.ram)
@@ -48,7 +84,7 @@ impl Memory {
         }
     }
 
-    pub fn write_byte(&mut self, address: u16, value: u8) {
+    fn write_byte(&mut self, address: u16, value: u8) {
         let (bank_id, offset) = self.map[(address >> 8) as usize];
         if bank_id > 0 && self.banks[bank_id - 1].is_writeable(address - offset) {
             self.banks[bank_id - 1].write_byte(address, offset, value, &mut self.ram);
@@ -57,18 +93,19 @@ impl Memory {
         }
     }
 
-    pub fn read_block(&self, start: u16, data: &mut [u8]) {
+    fn read_block(&self, start: u16, data: &mut [u8]) {
         for (i, d) in data.iter_mut().enumerate() {
             *d = self.read_byte(start + i as u16);
         }
     }
 
-    pub fn write_block(&mut self, start: u16, data: &[u8]) {
+    fn write_block(&mut self, start: u16, data: &[u8]) {
         for (i, d) in data.iter().enumerate() {
             self.write_byte(start + i as u16, *d);
         }
     }
 }
+
 
 pub struct RomBank {
     bytes: Vec<u8>,
@@ -143,16 +180,14 @@ mod tests {
 
     #[test]
     fn ram() {
-        let memory = Memory::new_shared();
-        let mut mem = memory.lock().unwrap();
+        let mem = Memory::new();
         mem.write_byte(0xBADA, 0xFC);
         assert_eq!(mem.read_byte(0xBADA), 0xFC);
     }
 
     #[test]
     fn banked_ram() {
-        let memory = Memory::new_shared();
-        let mut mem = memory.lock().unwrap();
+        let mem = Memory::new();
         mem.configure_banks(
             vec![TestBank::new_boxed(2048, true)],
             &[(0x3000, 1024, 1, 0x0000), (0x8000, 1024, 1, 0x0400)],
@@ -164,17 +199,16 @@ mod tests {
         assert_eq!(mem.read_byte(0x3001), 0x00);
         mem.write_byte(0x3001, 0xCD);
         assert_eq!(mem.read_byte(0x3001), 0xCD);
-        assert_eq!(mem.banks[0].read_byte(0x0001, 0, &[]), 0xCD);
+        assert_eq!(mem.read_bank_byte(1, 0x0001, 0), 0xCD);
 
         mem.write_byte(0x8001, 0xAB);
         assert_eq!(mem.read_byte(0x8001), 0xAB);
-        assert_eq!(mem.banks[0].read_byte(0x0401, 0, &[]), 0xAB);
+        assert_eq!(mem.read_bank_byte(1, 0x0401, 0), 0xAB);
     }
 
     #[test]
     fn banked_rom() {
-        let memory = Memory::new_shared();
-        let mut mem = memory.lock().unwrap();
+        let mem = Memory::new();
         mem.configure_banks(
             vec![RomBank::with_bytes(&[0xDE, 0xAD, 0xBE, 0xEF])],
             &[(0x3000, 1024, 1, 0x0000)],
@@ -184,6 +218,6 @@ mod tests {
         assert_eq!(mem.read_byte(0x3003), 0xEF);
         mem.write_byte(0x3003, 0xCD);
         assert_eq!(mem.read_byte(0x3003), 0xEF);
-        assert_eq!(mem.ram[0x3003], 0xCD);
+        assert_eq!(mem.ram(0x3003), 0xCD);
     }
 }

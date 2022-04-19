@@ -25,11 +25,8 @@ fn main() {
     rom_bytes[0x1ffa..].copy_from_slice(&[0x00, 0xf0, 0x00, 0xe0, 0x00, 0xf1]);
 
     // Create a new memory object with a ROM loaded into the top 8K
-    let memory = Memory::new_shared();
-    memory
-        .lock()
-        .unwrap()
-        .configure_banks(vec![RomBank::with_bytes(&rom_bytes)], &[(0xe000, 0x2000, 1, 0x0000)]);
+    let memory = Memory::new();
+    memory.configure_banks(vec![RomBank::with_bytes(&rom_bytes)], &[(0xe000, 0x2000, 1, 0x0000)]);
 
     // Create a CPU instance wired to the memory.
     let mut cpu = C6502::new(&memory);
