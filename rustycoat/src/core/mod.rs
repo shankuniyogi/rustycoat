@@ -13,20 +13,21 @@ pub trait Component: Send {
 
 enum ComponentState {
     Initial(Box<dyn Component>),
-    Running {
-        handle: JoinHandle<()>,
-        stop: Arc<AtomicBool>,
-    },
+    Running(JoinHandle<()>),
     None,
 }
 
 pub struct Computer {
     components: Vec<ComponentState>,
+    stop: Arc<AtomicBool>,
 }
 
 impl Computer {
     pub fn new() -> Computer {
-        Computer { components: Vec::new() }
+        Computer { 
+            components: Vec::new(),
+            stop: Arc::new(AtomicBool::new(false)),
+        }
     }
 
     pub fn add<T>(&mut self, c: T) -> &mut dyn Component
@@ -42,14 +43,14 @@ impl Computer {
     }
 
     pub fn start(&mut self) {
+        self.stop = Arc::new(AtomicBool::new(false));
         for component in self.components.iter_mut() {
             if let ComponentState::Initial(mut c) = mem::replace(component, ComponentState::None) {
-                let stop = Arc::new(AtomicBool::new(false));
-                let stop_clone = stop.clone();
+                let stop_clone = self.stop.clone();
                 let handle = thread::spawn(move || {
                     c.run(stop_clone);
                 });
-                *component = ComponentState::Running { handle, stop };
+                *component = ComponentState::Running(handle);
             } else {
                 panic!("component already running");
             }
@@ -57,13 +58,9 @@ impl Computer {
     }
 
     pub fn stop(&mut self) {
-        for component in self.components.iter() {
-            if let ComponentState::Running { stop, .. } = component {
-                stop.store(true, Ordering::Relaxed);
-            }
-        }
+        self.stop.store(true, Ordering::Relaxed);
         for component in self.components.iter_mut() {
-            if let ComponentState::Running { handle, .. } = mem::replace(component, ComponentState::None) {
+            if let ComponentState::Running(handle) = mem::replace(component, ComponentState::None) {
                 handle.join().ok();
             }
         }
