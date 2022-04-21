@@ -1432,13 +1432,13 @@ impl AsyncComponent for C6502 {
             if cycles == 0 {
                 start = Instant::now();
             }
-            let signal = self.phi0_in.wait();
+            let signal = self.phi0_in.recv();
             if stop.load(Ordering::Relaxed) {
                 break;
             }
 
-            self.phi1_out.update(!signal);
-            self.phi2_out.update(signal);
+            self.phi1_out.send(!signal);
+            self.phi2_out.send(signal);
             if signal {
                 self.step();
                 cycles += 1;

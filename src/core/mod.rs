@@ -78,7 +78,7 @@ impl Computer {
         if let Some(iui) = &iui {
             let mut event_loop = iui.event_loop();
             event_loop.on_tick(iui, || self.tick());
-            event_loop.run_delay(iui, 100);
+            event_loop.run_delay(iui, 10);
         } else {
             let (s, r): (Sender<()>, Receiver<()>) = unbounded();
             thread::spawn(move || {
@@ -87,8 +87,8 @@ impl Computer {
                 s.send(()).unwrap();
             });
             println!("Hit enter to stop");
-            while r.recv().is_err() {
-                thread::sleep(Duration::from_millis(100));
+            while r.try_recv().is_err() {
+                thread::sleep(Duration::from_millis(10));
                 self.tick();
             }
         }

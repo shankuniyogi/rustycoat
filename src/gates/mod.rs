@@ -65,7 +65,7 @@ where
             }
             let output = T::op(self.input_a.value(), self.input_b.value());
             println!("{}", output);
-            self.output.update(output);
+            self.output.send(output);
         }
     }
 }

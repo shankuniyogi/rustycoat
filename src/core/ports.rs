@@ -38,7 +38,7 @@ where
         target.receiver = Some(r);
     }
 
-    pub fn update(&mut self, new_value: T) {
+    pub fn send(&mut self, new_value: T) {
         self.value = new_value;
         if let Some(s) = self.sender.as_mut() {
             s.send(new_value).ok();
@@ -83,7 +83,7 @@ where
         Self { value: initial_value, receiver: None }
     }
 
-    pub fn wait(&mut self) -> T {
+    pub fn recv(&mut self) -> T {
         if let Some(r) = self.receiver.as_mut() {
             if let Ok(new_value) = r.recv() {
                 self.value = new_value;
@@ -92,6 +92,16 @@ where
         } else {
             panic!("Input port not connected");
         }
+    }
+
+    pub fn try_recv(&mut self) -> Option<T> {
+        if let Some(r) = self.receiver.as_mut() {
+            if let Ok(new_value) = r.try_recv() {
+                self.value = new_value;
+                return Some(self.value);
+            }
+        }
+        None
     }
 
     pub fn value(&self) -> T {

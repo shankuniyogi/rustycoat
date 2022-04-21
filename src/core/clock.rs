@@ -49,7 +49,7 @@ impl AsyncComponent for Clock {
                 time = start.elapsed();
                 break;
             }
-            self.output.update(!self.output.value());
+            self.output.send(!self.output.value());
         }
         println!(
             "Clock: {} ticks in {} ms, speed {} MHz",
