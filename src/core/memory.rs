@@ -44,6 +44,12 @@ impl Memory {
     }
 }
 
+impl Default for Memory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub trait MemoryBank {
     fn size(&self) -> usize;
     fn is_writeable(&self, addr: u16) -> bool;
@@ -105,7 +111,6 @@ impl MemoryImpl {
         }
     }
 }
-
 
 pub struct RomBank {
     bytes: Vec<u8>,

@@ -5,7 +5,7 @@ use std::time::Instant;
 
 use crate::core::memory::*;
 use crate::core::ports::{InputPin, OutputPin};
-use crate::core::*;
+use crate::core::AsyncComponent;
 
 pub struct C6502 {
     pc: u16,
@@ -80,7 +80,7 @@ impl C6502 {
     pub fn phi0_in(&mut self) -> &mut InputPin {
         &mut self.phi0_in
     }
-    
+
     pub fn phi1_out(&mut self) -> &mut OutputPin {
         &mut self.phi1_out
     }
@@ -1424,7 +1424,7 @@ impl C6502 {
     }
 }
 
-impl Component for C6502 {
+impl AsyncComponent for C6502 {
     fn run(&mut self, stop: Arc<AtomicBool>) {
         let mut cycles = 0;
         let mut start = Instant::now();

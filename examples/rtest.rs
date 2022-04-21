@@ -38,13 +38,8 @@ fn main() {
 
     // Create a computer, add components, and start it up.
     let mut c = Computer::new();
-    c.add(cpu);
-    c.add(clock);
-    c.start();
+    c.add_async(cpu);
+    c.add_async(clock);
 
-    println!("Hit enter to stop");
-    let mut input = String::new();
-    stdin().read_line(&mut input).unwrap();
-
-    c.stop();
+    c.run();
 }

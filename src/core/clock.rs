@@ -4,7 +4,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use crate::core::ports::OutputPin;
-use crate::core::Component;
+use crate::core::AsyncComponent;
 
 pub struct Clock {
     interval: Duration,
@@ -28,7 +28,7 @@ impl Clock {
     }
 }
 
-impl Component for Clock {
+impl AsyncComponent for Clock {
     fn run(&mut self, stop: Arc<AtomicBool>) {
         let start = Instant::now();
         let time;

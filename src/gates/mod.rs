@@ -2,7 +2,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use crate::core::ports::{InputPin, OutputPin};
-use crate::core::Component;
+use crate::core::AsyncComponent;
 
 pub struct BinaryGate<T>
 where
@@ -53,7 +53,7 @@ where
     }
 }
 
-impl<T> Component for BinaryGate<T>
+impl<T> AsyncComponent for BinaryGate<T>
 where
     T: BinaryOp + Send,
 {
