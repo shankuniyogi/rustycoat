@@ -1,5 +1,3 @@
-use std::io::stdin;
-
 use rustycoat::core::clock::*;
 use rustycoat::core::*;
 use rustycoat::widgets::leds::*;
@@ -15,7 +13,7 @@ fn main() {
     // Create a computer, add components, and start it up.
     let mut c = Computer::new();
     c.add_async(clock);
-    c.add_sync(led);
+    c.add_ui(led);
 
     c.run();
 }

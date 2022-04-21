@@ -9,4 +9,5 @@ edition = "2021"
 
 [dependencies]
 crossbeam-channel = "0.5"
+ctrlc = "3.2"
 iui = { git = "https://github.com/rust-native-ui/libui-rs", branch = "master" }

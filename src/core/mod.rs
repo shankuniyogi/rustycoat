@@ -1,7 +1,7 @@
 use crossbeam_channel::{unbounded, Receiver, Sender};
+use iui::controls::*;
 use iui::prelude::*;
 use std::cell::RefCell;
-use std::io::stdin;
 use std::mem;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -18,21 +18,29 @@ pub trait AsyncComponent: Send {
 }
 
 pub trait SyncComponent {
-    fn requires_ui(&self) -> bool;
-    fn start(&mut self, ui: Option<&iui::UI>);
-    fn tick(&mut self, ui: Option<&iui::UI>);
-    fn stop(&mut self, ui: Option<&iui::UI>);
+    fn start(&mut self);
+    fn tick(&mut self);
+    fn stop(&mut self);
 }
 
-enum AsyncComponentState {
+pub trait UiComponent: SyncComponent {
+    fn ui_new(&mut self, ui: iui::UI) -> Control;
+}
+
+enum AsyncComponentEntry {
     Initial(Box<dyn AsyncComponent>),
     Running(JoinHandle<()>),
     None,
 }
 
+enum SyncComponentEntry {
+    UI(Rc<RefCell<dyn UiComponent>>),
+    NonUI(Rc<RefCell<dyn SyncComponent>>),
+}
+
 pub struct Computer {
-    async_components: Vec<AsyncComponentState>,
-    sync_components: Vec<Rc<RefCell<dyn SyncComponent>>>,
+    async_components: Vec<AsyncComponentEntry>,
+    sync_components: Vec<SyncComponentEntry>,
     stop: Arc<AtomicBool>,
     requires_ui: bool,
     iui: Option<iui::UI>,
@@ -54,9 +62,9 @@ impl Computer {
         T: AsyncComponent + Sized + 'static,
     {
         let c = Box::new(c);
-        self.async_components.push(AsyncComponentState::Initial(c));
+        self.async_components.push(AsyncComponentEntry::Initial(c));
         match self.async_components.last_mut().unwrap() {
-            AsyncComponentState::Initial(c) => c.as_mut(),
+            AsyncComponentEntry::Initial(c) => c.as_mut(),
             _ => panic!("unreachable"),
         }
     }
@@ -67,8 +75,18 @@ impl Computer {
     {
         let c = Rc::new(RefCell::new(c));
         let ret = c.clone();
-        self.sync_components.push(c);
-        self.requires_ui |= ret.borrow().requires_ui();
+        self.sync_components.push(SyncComponentEntry::NonUI(c));
+        ret
+    }
+
+    pub fn add_ui<T>(&mut self, c: T) -> Rc<RefCell<dyn UiComponent>>
+    where
+        T: UiComponent + Sized + 'static,
+    {
+        let c = Rc::new(RefCell::new(c));
+        let ret = c.clone();
+        self.sync_components.push(SyncComponentEntry::UI(c));
+        self.requires_ui = true;
         ret
     }
 
@@ -78,17 +96,16 @@ impl Computer {
         if let Some(iui) = &iui {
             let mut event_loop = iui.event_loop();
             event_loop.on_tick(iui, || self.tick());
-            event_loop.run_delay(iui, 10);
+            event_loop.run_delay(iui, 1);
         } else {
             let (s, r): (Sender<()>, Receiver<()>) = unbounded();
-            thread::spawn(move || {
-                let mut buffer = String::new();
-                stdin().read_line(&mut buffer).unwrap();
+            ctrlc::set_handler(move || {
                 s.send(()).unwrap();
-            });
-            println!("Hit enter to stop");
+            })
+            .expect("Error setting Ctrl-C handler");
+            println!("Hit Ctrl-C to stop");
             while r.try_recv().is_err() {
-                thread::sleep(Duration::from_millis(10));
+                thread::sleep(Duration::from_millis(1));
                 self.tick();
             }
         }
@@ -101,36 +118,59 @@ impl Computer {
         }
         self.stop = Arc::new(AtomicBool::new(false));
         for component in self.async_components.iter_mut() {
-            if let AsyncComponentState::Initial(mut c) = mem::replace(component, AsyncComponentState::None) {
+            if let AsyncComponentEntry::Initial(mut c) = mem::replace(component, AsyncComponentEntry::None) {
                 let stop_clone = self.stop.clone();
                 let handle = thread::spawn(move || {
                     c.run(stop_clone);
                 });
-                *component = AsyncComponentState::Running(handle);
+                *component = AsyncComponentEntry::Running(handle);
             } else {
                 panic!("async component already running");
             }
         }
         for component in self.sync_components.iter_mut() {
-            component.borrow_mut().start(self.iui.as_ref());
+            match component {
+                SyncComponentEntry::UI(c) => {
+                    let ui = self.iui.as_ref().unwrap();
+                    let mut window = Window::new(ui, "Rustycoat", 100, 100, WindowType::NoMenubar);
+                    window.set_child(ui, c.borrow_mut().ui_new(ui.clone()));
+                    c.borrow_mut().start();
+                    window.show(ui);
+                },
+                SyncComponentEntry::NonUI(c) => {
+                    c.borrow_mut().start();
+                },
+            }
         }
     }
 
     pub fn tick(&mut self) {
         for component in self.sync_components.iter_mut() {
-            component.borrow_mut().tick(self.iui.as_ref());
+            match component {
+                SyncComponentEntry::UI(c) => {
+                    c.borrow_mut().tick();
+                },
+                SyncComponentEntry::NonUI(c) => c.borrow_mut().tick(),
+            };
         }
     }
 
     pub fn stop(&mut self) {
         self.stop.store(true, Ordering::Relaxed);
         for component in self.async_components.iter_mut() {
-            if let AsyncComponentState::Running(handle) = mem::replace(component, AsyncComponentState::None) {
+            if let AsyncComponentEntry::Running(handle) = mem::replace(component, AsyncComponentEntry::None) {
                 handle.join().ok();
             }
         }
         for component in self.sync_components.iter_mut() {
-            component.borrow_mut().stop(self.iui.as_ref());
+            match component {
+                SyncComponentEntry::UI(c) => {
+                    c.borrow_mut().stop();
+                },
+                SyncComponentEntry::NonUI(c) => {
+                    c.borrow_mut().stop();
+                },
+            };
         }
     }
 }
