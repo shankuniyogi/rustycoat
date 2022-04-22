@@ -17,6 +17,12 @@ pub trait AsyncComponent: Send {
     fn run(&mut self, stop: Arc<AtomicBool>);
 }
 
+enum AsyncComponentEntry {
+    Initial(Box<dyn AsyncComponent>),
+    Running(JoinHandle<()>),
+    None,
+}
+
 pub trait SyncComponent {
     fn start(&mut self);
     fn tick(&mut self);
@@ -24,13 +30,7 @@ pub trait SyncComponent {
 }
 
 pub trait UiComponent: SyncComponent {
-    fn ui_new(&mut self, ui: iui::UI) -> Control;
-}
-
-enum AsyncComponentEntry {
-    Initial(Box<dyn AsyncComponent>),
-    Running(JoinHandle<()>),
-    None,
+    fn create_control(&mut self, self_ref: &Rc<RefCell<dyn UiComponent>>, ui: iui::UI) -> Control;
 }
 
 enum SyncComponentEntry {
@@ -130,11 +130,13 @@ impl Computer {
         }
         for component in self.sync_components.iter_mut() {
             match component {
-                SyncComponentEntry::UI(c) => {
+                SyncComponentEntry::UI(component) => {
                     let ui = self.iui.as_ref().unwrap();
+                    let mut c = component.borrow_mut();
                     let mut window = Window::new(ui, "Rustycoat", 100, 100, WindowType::NoMenubar);
-                    window.set_child(ui, c.borrow_mut().ui_new(ui.clone()));
-                    c.borrow_mut().start();
+                    let ctrl = c.create_control(&component, ui.clone());
+                    window.set_child(ui, ctrl);
+                    c.start();
                     window.show(ui);
                 },
                 SyncComponentEntry::NonUI(c) => {
@@ -150,8 +152,10 @@ impl Computer {
                 SyncComponentEntry::UI(c) => {
                     c.borrow_mut().tick();
                 },
-                SyncComponentEntry::NonUI(c) => c.borrow_mut().tick(),
-            };
+                SyncComponentEntry::NonUI(c) => {
+                    c.borrow_mut().tick();
+                },
+            }
         }
     }
 

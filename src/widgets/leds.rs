@@ -1,4 +1,8 @@
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use iui::controls::*;
+use iui::draw::*;
 use iui::UI;
 
 use crate::core::ports::InputPin;
@@ -52,10 +56,29 @@ impl SyncComponent for Led {
 }
 
 impl UiComponent for Led {
-    fn ui_new(&mut self, ui: iui::UI) -> Control {
+    fn create_control(&mut self, self_ref: &Rc<RefCell<dyn UiComponent>>, ui: iui::UI) -> Control {
         let label = Label::new(&ui, "LED");
         self.label = Some(label.clone());
         self.ui = Some(ui);
         label.into()
+    }
+}
+
+struct Draw {
+    component: Rc<RefCell<Led>>,
+}
+
+impl AreaHandler for Draw {
+    fn draw(&mut self, _: &Area, draw_params: &AreaDrawParams) {
+        let ctx = &draw_params.context;
+        let path = Path::new(ctx, FillMode::Winding);
+        path.add_rectangle(ctx, 0.0, 0.0, draw_params.area_width, draw_params.area_height);
+        path.end(ctx);
+        let brush = if self.component.borrow().input.value() {
+            Brush::Solid(SolidBrush { r: 1.0, g: 0.0, b: 0.0, a: 1.0 })
+        } else {
+            Brush::Solid(SolidBrush { r: 0.0, g: 0.0, b: 0.0, a: 1.0 })
+        };
+        ctx.fill(&path, &brush);
     }
 }
