@@ -6,7 +6,7 @@ fn main() {
     // Create an LED
     let mut led = Led::new();
 
-    // Create a 1MHz clock and wire it up to the LED.
+    // Create a 1Hz clock and wire it up to the LED.
     let mut clock = Clock::new(1);
     clock.output().connect_to(led.input());
 
