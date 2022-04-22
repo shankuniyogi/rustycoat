@@ -6,8 +6,8 @@ fn main() {
     // Create an LED
     let mut led = Led::new();
 
-    // Create a 1Hz clock and wire it up to the LED.
-    let mut clock = Clock::new(1);
+    // Create a 5Hz clock and wire it up to the LED.
+    let mut clock = Clock::new(5);
     clock.output().connect_to(led.input());
 
     // Create the computer, add components, and start it up.
