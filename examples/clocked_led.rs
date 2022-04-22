@@ -6,11 +6,11 @@ fn main() {
     // Create an LED
     let mut led = Led::new();
 
-    // Create a 1MHz clock and wire it up to the CPU.
+    // Create a 1MHz clock and wire it up to the LED.
     let mut clock = Clock::new(1);
     clock.output().connect_to(led.input());
 
-    // Create a computer, add components, and start it up.
+    // Create the computer, add components, and start it up.
     let mut c = Computer::new();
     c.add_async(clock);
     c.add_ui(led);
