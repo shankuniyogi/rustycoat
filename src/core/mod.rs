@@ -30,7 +30,7 @@ pub trait SyncComponent {
 }
 
 pub trait UiComponent: SyncComponent {
-    fn create_control(&mut self, self_ref: &Rc<RefCell<dyn UiComponent>>, ui: iui::UI) -> Control;
+    fn create_control(&mut self, ui: iui::UI) -> Control;
 }
 
 enum SyncComponentEntry {
@@ -134,7 +134,7 @@ impl Computer {
                     let ui = self.iui.as_ref().unwrap();
                     let mut c = component.borrow_mut();
                     let mut window = Window::new(ui, "Rustycoat", 100, 100, WindowType::NoMenubar);
-                    let ctrl = c.create_control(&component, ui.clone());
+                    let ctrl = c.create_control(ui.clone());
                     window.set_child(ui, ctrl);
                     c.start();
                     window.show(ui);

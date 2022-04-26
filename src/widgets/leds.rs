@@ -7,19 +7,22 @@ use iui::UI;
 
 use crate::core::ports::InputPin;
 use crate::core::{SyncComponent, UiComponent};
+use crate::widgets::Color;
 
 pub struct Led {
     input: InputPin,
     ui: Option<UI>,
-    label: Option<Label>,
+    area: Option<Area>,
+    draw_state: Rc<RefCell<DrawState>>
 }
 
 impl Led {
-    pub fn new() -> Self {
+    pub fn new(on_color: Color, off_color: Color) -> Self {
         Self {
             input: InputPin::new(),
             ui: None,
-            label: None,
+            area: None,
+            draw_state: Rc::new(RefCell::new(DrawState { state: false, on_color, off_color }))
         }
     }
 
@@ -28,16 +31,14 @@ impl Led {
     }
 
     fn update(&mut self) {
-        self.label
-            .as_mut()
-            .unwrap()
-            .set_text(self.ui.as_ref().unwrap(), if self.input.value() { "ON" } else { "OFF" });
+        self.draw_state.borrow_mut().state = self.input.value();
+        self.area.as_ref().unwrap().queue_redraw_all(&self.ui.as_ref().unwrap());
     }
 }
 
 impl Default for Led {
     fn default() -> Self {
-        Self::new()
+        Self::new(Color { r: 1.0, g: 0.0, b: 0.0 }, Color { r: 0.4, g: 0.4, b: 0.4 })
     }
 }
 
@@ -56,28 +57,32 @@ impl SyncComponent for Led {
 }
 
 impl UiComponent for Led {
-    fn create_control(&mut self, self_ref: &Rc<RefCell<dyn UiComponent>>, ui: iui::UI) -> Control {
-        let label = Label::new(&ui, "LED");
-        self.label = Some(label.clone());
+    fn create_control(&mut self, ui: iui::UI) -> Control {
+        let area = Area::new(&ui, self.draw_state.clone());
+        self.area = Some(area.clone());
         self.ui = Some(ui);
-        label.into()
+        area.into()
     }
 }
 
-struct Draw {
-    component: Rc<RefCell<Led>>,
+struct DrawState {
+    state: bool,
+    on_color: Color,
+    off_color: Color
 }
 
-impl AreaHandler for Draw {
+impl AreaHandler for DrawState {
     fn draw(&mut self, _: &Area, draw_params: &AreaDrawParams) {
         let ctx = &draw_params.context;
         let path = Path::new(ctx, FillMode::Winding);
-        path.add_rectangle(ctx, 0.0, 0.0, draw_params.area_width, draw_params.area_height);
+        let radius = f64::min(draw_params.area_width, draw_params.area_height) / 2.0;
+        path.new_figure_with_arc(ctx, draw_params.area_width / 2.0, draw_params.area_height / 2.0,
+            radius, 0.0, std::f64::consts::PI * 2.0, false);
         path.end(ctx);
-        let brush = if self.component.borrow().input.value() {
-            Brush::Solid(SolidBrush { r: 1.0, g: 0.0, b: 0.0, a: 1.0 })
+        let brush = if self.state {
+            Brush::Solid(SolidBrush::from(&self.on_color))
         } else {
-            Brush::Solid(SolidBrush { r: 0.0, g: 0.0, b: 0.0, a: 1.0 })
+            Brush::Solid(SolidBrush::from(&self.off_color))
         };
         ctx.fill(&path, &brush);
     }
